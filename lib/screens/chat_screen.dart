@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
@@ -20,6 +21,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final messageTextController = TextEditingController();
   final _auth = FirebaseAuth.instance;
 
+  final TextEditingController _messageController = TextEditingController();
   String? message;
 
   void getCurrentUser() async {
@@ -80,17 +82,26 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: <Widget>[
                   Expanded(
                     child: TextField(
+                      controller: _messageController,
                       onChanged: (value) {
                         message = value;
                       },
+                      style: const TextStyle(color: Colors.black54),
                       decoration: kMessageTextFieldDecoration,
                     ),
                   ),
                   TextButton(
-                    onPressed: () {
+                    onPressed: () async {
                       if (message != null) {
-                        _fireStore.collection('message').add(
-                            {'text': message, 'sender': loggedInUser?.email});
+                        await _fireStore.collection('message').add({
+                          'text': message,
+                          'sender': loggedInUser?.email,
+                          'timestamp': DateTime.now()
+                        });
+                        setState(() {
+                          _messageController.clear();
+                          message = '';
+                        });
                       }
                     },
                     child: const Text(
@@ -114,7 +125,8 @@ class MessageStream extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-        stream: _fireStore.collection('message').snapshots(),
+        stream:
+            _fireStore.collection('message').orderBy('timestamp').snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(
@@ -139,8 +151,9 @@ class MessageStream extends StatelessWidget {
           }
           return Expanded(
             child: ListView(
-              reverse: true,
-              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 20.0),
+              dragStartBehavior: DragStartBehavior.down,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10.0, vertical: 20.0),
               children: messageBubbles,
             ),
           );
